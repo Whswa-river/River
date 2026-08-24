@@ -33,9 +33,10 @@ def build():
 def package(version):
     print('2. Packaging...')
     os.makedirs(os.path.dirname(ZIP_PATH), exist_ok=True)
-    dll_path = os.path.join(SCRIPT_DIR, 'RiverBox', 'bin', 'Release', 'RiverBox.dll')
+    build_dir = os.path.join(SCRIPT_DIR, 'RiverBox', 'bin', 'Release')
     with zipfile.ZipFile(ZIP_PATH, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        zipf.write(dll_path, 'RiverBox.dll')
+        zipf.write(os.path.join(build_dir, 'RiverBox.dll'), 'RiverBox.dll')
+        zipf.write(os.path.join(build_dir, 'ECommons.dll'), 'ECommons.dll')
         zipf.write(ICON_PATH, 'icon.png')
     print(f'   Created {ZIP_PATH}')
 
