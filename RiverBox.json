@@ -13,8 +13,8 @@
             "Utilities"
         ],
         "IconUrl": "https://raw.githubusercontent.com/Whswa-river/River/main/icon.png",
-        "DownloadLinkInstall": "https://github.com/Whswa-river/River/releases/download/latest/latest.zip",
-        "DownloadLinkTesting": "https://github.com/Whswa-river/River/releases/download/latest/latest.zip",
-        "DownloadLinkUpdate": "https://github.com/Whswa-river/River/releases/download/latest/latest.zip"
+        "DownloadLinkInstall": "https://github.com/Whswa-river/River/releases/download/v1.0.0.0/RiverBox.zip",
+        "DownloadLinkTesting": "https://github.com/Whswa-river/River/releases/download/v1.0.0.0/RiverBox.zip",
+        "DownloadLinkUpdate": "https://github.com/Whswa-river/River/releases/download/v1.0.0.0/RiverBox.zip"
     }
 ]
