@@ -37,6 +37,8 @@ def package(version):
     with zipfile.ZipFile(ZIP_PATH, 'w', zipfile.ZIP_DEFLATED) as zipf:
         zipf.write(os.path.join(build_dir, 'RiverBox.dll'), 'RiverBox.dll')
         zipf.write(os.path.join(build_dir, 'ECommons.dll'), 'ECommons.dll')
+        zipf.write(os.path.join(build_dir, 'RiverBox.json'), 'RiverBox.json')
+        zipf.write(os.path.join(build_dir, 'RiverBox.deps.json'), 'RiverBox.deps.json')
         zipf.write(ICON_PATH, 'icon.png')
     print(f'   Created {ZIP_PATH}')
 
