@@ -1,0 +1,57 @@
+﻿<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+
+  <PropertyGroup>
+    <Version>1.0.2.0</Version>
+    <Author>River</Author>
+    <Name>RiverBox</Name>
+    <InternalName>RiverBox</InternalName>
+    <Punchline>RiverBox 自用插件</Punchline>
+    <Description>RiverBox 自用插件</Description>
+    <DalamudApiLevel>15</DalamudApiLevel>
+    <DalamudLibPath>$(APPDATA)\XIVLauncherCN\addon\Hooks\dev\</DalamudLibPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="icon.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>images\icon.png</Link>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ECommons" Version="3.2.0.11" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Update="Dalamud">
+      <HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
+    </Reference>
+    <Reference Update="Dalamud.Bindings.ImGui">
+      <HintPath>$(DalamudLibPath)Dalamud.Bindings.ImGui.dll</HintPath>
+    </Reference>
+    <Reference Update="FFXIVClientStructs">
+      <HintPath>$(DalamudLibPath)FFXIVClientStructs.dll</HintPath>
+    </Reference>
+    <Reference Update="InteropGenerator.Runtime">
+      <HintPath>$(DalamudLibPath)InteropGenerator.Runtime.dll</HintPath>
+    </Reference>
+    <Reference Update="Newtonsoft.Json">
+      <HintPath>$(DalamudLibPath)Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Update="Lumina">
+      <HintPath>$(DalamudLibPath)Lumina.dll</HintPath>
+    </Reference>
+    <Reference Update="Lumina.Excel">
+      <HintPath>$(DalamudLibPath)Lumina.Excel.dll</HintPath>
+    </Reference>
+    <Reference Update="Serilog">
+      <HintPath>$(DalamudLibPath)Serilog.dll</HintPath>
+    </Reference>
+    <Reference Update="Microsoft.Extensions.ObjectPool">
+      <HintPath>$(DalamudLibPath)Microsoft.Extensions.ObjectPool.dll</HintPath>
+    </Reference>
+    <Reference Remove="Dalamud.Bindings.ImPlot" />
+    <Reference Remove="Dalamud.Bindings.ImGuizmo" />
+  </ItemGroup>
+
+</Project>
