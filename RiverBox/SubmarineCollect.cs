@@ -29,9 +29,7 @@ public class SubmarineCollect : IDisposable
         Relogging,
         WaitingForCharacterReady,
         ExecutingPdr,
-        WaitingForWorkshop,
-        WaitingForCollect,
-        WaitingForWindow,
+        WaitingAfterPdr,
         ClosingUI,
         Completed
     }
@@ -39,15 +37,10 @@ public class SubmarineCollect : IDisposable
     private CollectState _currentState = CollectState.Idle;
     private Stopwatch _stateTimer = new();
     private string _currentCharacterName = "";
-    private bool _selectStringClosed = false;
-    private bool _selectString2Closed = false;
-    private bool _confirmWindowClosed = false;
-    private DateTime? _windowOpenedAt = null;
     private System.Diagnostics.Stopwatch _closingWatch = new();
 
-    private const ushort WorkshopTerritoryId = 653;
     private const int PdrExecDelayMs = 5000;
-    private const int WindowStableMs = 10000;
+    private const int WaitAfterPdrMs = 50000;
 
     private static readonly Vector4 AccentColor = new(0f, 1f, 1f, 1f);
     private static readonly Vector4 PrimaryText = new(0.9f, 0.95f, 1f, 1f);
@@ -87,14 +80,8 @@ public class SubmarineCollect : IDisposable
             case CollectState.ExecutingPdr:
                 HandleExecutingPdrState();
                 break;
-            case CollectState.WaitingForWorkshop:
-                HandleWaitingForWorkshopState();
-                break;
-            case CollectState.WaitingForCollect:
-                HandleWaitingForCollectState();
-                break;
-            case CollectState.WaitingForWindow:
-                HandleWaitingForWindowState();
+            case CollectState.WaitingAfterPdr:
+                HandleWaitingAfterPdrState();
                 break;
             case CollectState.ClosingUI:
                 HandleClosingUIState();
@@ -146,95 +133,28 @@ public class SubmarineCollect : IDisposable
             UpdateStatus($"执行收艇指令... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
             Chat.ExecuteCommand("/pdr submarine");
             _stateTimer.Restart();
-            _currentState = CollectState.WaitingForWorkshop;
+            _currentState = CollectState.WaitingAfterPdr;
         }
     }
 
-    private void HandleWaitingForWorkshopState()
+    private void HandleWaitingAfterPdrState()
     {
-        if (Svc.ClientState.TerritoryType == WorkshopTerritoryId)
-        {
-            UpdateStatus($"已进入部队工坊，等待收艇完成... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
-            _stateTimer.Restart();
-            _currentState = CollectState.WaitingForCollect;
-            return;
-        }
+        var vessels = SubmarineStatus.GetVesselData();
+        bool allVoyaging = vessels.Count > 0 && vessels.All(v => v.ReturnTime > 0 && !v.IsCompleted);
 
-        if (_stateTimer.ElapsedMilliseconds > 60000)
+        if (allVoyaging && _stateTimer.ElapsedMilliseconds >= WaitAfterPdrMs)
         {
-            UpdateStatus($"等待进入工坊超时，跳过... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
-            SkipToNextCharacter();
-        }
-    }
-
-    private void HandleWaitingForCollectState()
-    {
-        // pdr 收完所有艇后会弹出 SelectString 窗口，此时应进入关闭界面阶段，
-        // 而不是死等 allVoyaging，否则窗口残留导致无法切换角色。
-        if (IsSelectStringOpen() && _stateTimer.ElapsedMilliseconds > 5000)
-        {
-            UpdateStatus($"收艇完成，正在关闭界面... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
+            UpdateStatus($"收艇完成，准备关闭界面... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
             _stateTimer.Restart();
             _closingWatch.Restart();
             _currentState = CollectState.ClosingUI;
             return;
         }
 
-        var vessels = SubmarineStatus.GetVesselData();
-        bool allVoyaging = vessels.Count > 0 && vessels.All(v => v.ReturnTime > 0 && !v.IsCompleted);
-
-        if (allVoyaging)
+        if (_stateTimer.ElapsedMilliseconds > 90000)
         {
-            UpdateStatus($"收艇完成，等待窗口出现... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
-            _stateTimer.Restart();
-            _currentState = CollectState.WaitingForWindow;
-            return;
-        }
-
-        if (_stateTimer.ElapsedMilliseconds > 60000)
-        {
-            if (IsSelectStringOpen())
-            {
-                UpdateStatus($"等待收艇超时，尝试关闭窗口... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
-                _stateTimer.Restart();
-                _closingWatch.Restart();
-                _currentState = CollectState.ClosingUI;
-            }
-            else
-            {
-                UpdateStatus($"等待收艇完成超时，跳过... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
-                SkipToNextCharacter();
-            }
-        }
-    }
-
-    private void HandleWaitingForWindowState()
-    {
-        if (_stateTimer.ElapsedMilliseconds > 30000)
-        {
-            UpdateStatus($"等待窗口超时，跳过... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
-            _windowOpenedAt = null;
+            UpdateStatus($"等待收艇完成超时，跳过... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
             SkipToNextCharacter();
-            return;
-        }
-
-        if (IsSelectStringOpen())
-        {
-            if (_windowOpenedAt == null)
-                _windowOpenedAt = DateTime.Now;
-
-            if ((DateTime.Now - _windowOpenedAt.Value).TotalMilliseconds >= WindowStableMs)
-            {
-                UpdateStatus($"窗口稳定，关闭界面... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
-                _windowOpenedAt = null;
-                _stateTimer.Restart();
-                _closingWatch.Restart();
-                _currentState = CollectState.ClosingUI;
-            }
-        }
-        else
-        {
-            _windowOpenedAt = null;
         }
     }
 
@@ -245,63 +165,38 @@ public class SubmarineCollect : IDisposable
 
         _stateTimer.Restart();
 
-        // 整体超时兜底：如果长时间仍无法关闭窗口，尝试强制关闭并继续
+        // 整体超时兜底：如果长时间仍无法关闭窗口，强制关闭并继续
         if (_closingWatch.ElapsedMilliseconds > 40000)
         {
-            UpdateStatus($"关闭窗口超时，尝试其它回调并继续... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
+            UpdateStatus($"关闭窗口超时，强制关闭并继续... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
             TryForceCloseWindow();
-            _confirmWindowClosed = false;
             CompleteCharacterCollect();
             return;
         }
 
-        // 第一阶段：重复执行回调 4 直到窗口关闭
-        if (!_selectStringClosed)
+        // 状态 32 (OccupiedInQuestEvent)：用回调指令 4 关闭
+        if (Svc.Condition[ConditionFlag.OccupiedInQuestEvent])
         {
-            if (IsSelectStringOpen())
-            {
-                UpdateStatus($"关闭选择菜单... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
-                Chat.ExecuteCommand("/pdr callback SelectString 4");
-            }
-            else
-            {
-                _selectStringClosed = true;
-            }
+            UpdateStatus($"关闭任务事件窗口 (回调4)... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
+            Chat.ExecuteCommand("/pdr callback SelectString 4");
             return;
         }
 
-        // 第二阶段：重复执行回调 2 直到窗口关闭
-        if (!_selectString2Closed)
+        // 状态 31 (OccupiedInEvent)：用回调指令 2 关闭
+        if (Svc.Condition[ConditionFlag.OccupiedInEvent])
         {
-            if (IsSelectStringOpen())
-            {
-                UpdateStatus($"关闭子菜单... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
-                Chat.ExecuteCommand("/pdr callback SelectString 2");
-            }
-            else
-            {
-                _selectString2Closed = true;
-            }
+            UpdateStatus($"关闭事件窗口 (回调2)... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
+            Chat.ExecuteCommand("/pdr callback SelectString 2");
             return;
         }
 
-        // 第三阶段：确认窗口已关闭
-        if (!_confirmWindowClosed)
+        // 状态 1 (NormalConditions)：窗口已关、角色可移动，切换角色
+        if (!Svc.Condition[ConditionFlag.OccupiedInEvent] &&
+            !Svc.Condition[ConditionFlag.OccupiedInQuestEvent])
         {
-            if (IsSelectStringOpen())
-            {
-                _selectStringClosed = false;
-                _selectString2Closed = false;
-            }
-            else
-            {
-                _confirmWindowClosed = true;
-            }
-            return;
+            UpdateStatus($"窗口已关闭，切换下一角色... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
+            CompleteCharacterCollect();
         }
-
-        _confirmWindowClosed = false;
-        CompleteCharacterCollect();
     }
 
     private void CompleteCharacterCollect()
@@ -314,9 +209,6 @@ public class SubmarineCollect : IDisposable
             UpdateStatus($"已缓存 {preset.FullName} 的 {vessels.Count} 艘潜艇数据 ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
         }
 
-        _selectStringClosed = false;
-        _selectString2Closed = false;
-        _confirmWindowClosed = false;
         _stateTimer.Restart();
         _closingWatch.Reset();
         SkipToNextCharacter();
@@ -356,9 +248,6 @@ public class SubmarineCollect : IDisposable
         _isCollecting = true;
         _currentPresetIndex = 0;
         _currentState = CollectState.Idle;
-        _selectStringClosed = false;
-        _selectString2Closed = false;
-        _confirmWindowClosed = false;
         _closingWatch.Reset();
         UpdateStatus("开始多角色收艇...");
         ProcessNextCharacter();
@@ -456,12 +345,6 @@ public class SubmarineCollect : IDisposable
         _statusMessage = message;
         _lastStatusUpdate = DateTime.Now;
         Svc.Log.Info($"[SubmarineCollect] {message}");
-    }
-
-    private static unsafe bool IsSelectStringOpen()
-    {
-        var addon = Svc.GameGui.GetAddonByName("SelectString");
-        return addon != null && addon != default;
     }
 
     private static void TryForceCloseWindow()
