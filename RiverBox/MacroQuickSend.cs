@@ -218,6 +218,10 @@ ImGui.TextColored(AccentColor, "快捷发宏");
         ImGui.SameLine();
         ImGui.TextColored(_config.ModuleEnabled ? SuccessColor : WarningColor,
             _config.ModuleEnabled ? "[已启用]" : "[已禁用]");
+
+        if (!_config.ModuleEnabled)
+            return;
+
         ImGui.Spacing();
 
         bool showNotifications = _config.ShowNotifications;

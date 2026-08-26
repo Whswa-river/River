@@ -12,7 +12,7 @@ namespace RiverBox;
 public sealed class UIWindow : IDisposable
 {
     private const string Title = "RiverBox";
-    private const string Version = "v1.0.4.0";
+    private const string Version = "v1.0.5.0";
 
     private static readonly Vector4 AccentColor = new(0f, 1f, 1f, 1f);          // 霓虹青
     private static readonly Vector4 PrimaryText = new(0.9f, 0.95f, 1f, 1f);      // 亮白偏蓝
@@ -57,13 +57,14 @@ public sealed class UIWindow : IDisposable
 
     private readonly string[] _tabs =
     {
-        "日常", "插件管理",
+        "日常", "插件管理", "自动化",
     };
 
     private readonly string[][] _featuresByTab =
     {
-        new[] { "快捷发宏", "自动收艇", "随心而行" },
+        new[] { "快捷发宏", "随心而行" },
         new[] { "插件管理" },
+        new[] { "自动收艇" },
     };
 
     public UIWindow()
@@ -237,12 +238,6 @@ public sealed class UIWindow : IDisposable
 
             if (_selectedFeature == 1)
             {
-                DrawSubmarinePanel();
-                return;
-            }
-
-            if (_selectedFeature == 2)
-            {
                 _teleportManager.DrawConfig();
                 return;
             }
@@ -257,6 +252,15 @@ public sealed class UIWindow : IDisposable
             if (_selectedFeature == 0)
                 DrawPluginPanel();
             return;
+        }
+
+        if (_activeTab == 2)
+        {
+            if (_selectedFeature == 0)
+            {
+                DrawSubmarinePanel();
+                return;
+            }
         }
 
         ImGui.TextColored(SecondaryText, "该标签待实现");

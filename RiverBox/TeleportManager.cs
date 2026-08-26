@@ -293,6 +293,9 @@ public class TeleportManager : IDisposable
         ImGui.TextColored(_config.ModuleEnabled ? ActiveColor : SecondaryText,
             _config.ModuleEnabled ? "[已启用]" : "[已禁用]");
 
+        if (!_config.ModuleEnabled)
+            return;
+
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();

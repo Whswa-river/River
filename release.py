@@ -21,11 +21,13 @@ def get_version():
     ns = '{http://schemas.microsoft.com/developer/msbuild/2003}'
     for elem in root.iter(f'{ns}Version'):
         return elem.text
+    for elem in root.iter('Version'):
+        return elem.text
     raise Exception('Version not found in csproj')
 
 def build():
     print('1. Building...')
-    ret = os.system(f'dotnet build -c Release -p:ProjectDir="{os.path.join(SCRIPT_DIR, "RiverBox")}"')
+    ret = os.system(f'dotnet build -c Release "{CSPROJ_PATH}"')
     if ret != 0:
         print('Build failed!')
         sys.exit(1)
@@ -104,9 +106,7 @@ def update_json(version, download_url):
 
 def git_push():
     print('5. Pushing to GitHub...')
-    os.system('git add RiverBox.json')
-    os.system(f'git commit -m "Release {get_version()}"')
-    os.system('git push origin main')
+    os.system(f'cd "{SCRIPT_DIR}" && git add RiverBox.json && git add -A && git commit -m "Release {get_version()}" && git push origin main')
 
 def main():
     token = os.environ.get('GH_TOKEN') or os.environ.get('GITHUB_TOKEN')
