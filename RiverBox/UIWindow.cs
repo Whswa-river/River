@@ -12,7 +12,7 @@ namespace RiverBox;
 public sealed class UIWindow : IDisposable
 {
     private const string Title = "RiverBox";
-    private const string Version = "v1.0.5.0";
+    private const string Version = "v1.0.6.0";
 
     private static readonly Vector4 AccentColor = new(0f, 1f, 1f, 1f);          // 霓虹青
     private static readonly Vector4 PrimaryText = new(0.9f, 0.95f, 1f, 1f);      // 亮白偏蓝
@@ -411,6 +411,32 @@ public sealed class UIWindow : IDisposable
                     _submarineCollect.Config.RemovePreset(preset.CharacterName, preset.WorldName);
                     i--;
                 }
+                ImGui.SameLine();
+                if (i > 0)
+                {
+                    if (ImGui.SmallButton("↑"))
+                        _submarineCollect.Config.MovePreset(i, i - 1);
+                }
+                else
+                {
+                    ImGui.BeginDisabled();
+                    ImGui.SmallButton("↑");
+                    ImGui.EndDisabled();
+                }
+
+                ImGui.SameLine();
+                if (i < _submarineCollect.Config.CharacterPresets.Count - 1)
+                {
+                    if (ImGui.SmallButton("↓"))
+                        _submarineCollect.Config.MovePreset(i, i + 1);
+                }
+                else
+                {
+                    ImGui.BeginDisabled();
+                    ImGui.SmallButton("↓");
+                    ImGui.EndDisabled();
+                }
+
                 ImGui.SameLine();
                 if (ImGui.SmallButton("切换"))
                 {

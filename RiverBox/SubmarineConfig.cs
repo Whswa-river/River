@@ -79,6 +79,16 @@ public class SubmarineConfig
         Save();
     }
 
+    public void MovePreset(int fromIndex, int toIndex)
+    {
+        if (fromIndex < 0 || fromIndex >= CharacterPresets.Count) return;
+        if (toIndex < 0 || toIndex >= CharacterPresets.Count) return;
+        var item = CharacterPresets[fromIndex];
+        CharacterPresets.RemoveAt(fromIndex);
+        CharacterPresets.Insert(toIndex, item);
+        Save();
+    }
+
     public string GetRelogCommand(CharacterPreset preset)
     {
         return $"/ays relog {preset.CharacterName}@{preset.WorldName}";
