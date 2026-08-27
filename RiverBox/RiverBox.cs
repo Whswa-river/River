@@ -28,17 +28,17 @@ public sealed class RiverBox : IDalamudPlugin
         pluginInterface.UiBuilder.OpenConfigUi += Toggle;
 
         Svc.Commands.AddHandler("/riverbox", new CommandInfo(OnCommand) { HelpMessage = HelpMessage });
-        Svc.Commands.AddHandler("/RB", new CommandInfo(OnCommand) { HelpMessage = HelpMessage });
-        Svc.Commands.AddHandler("/RB mqs", new CommandInfo(OnCommand) { HelpMessage = "打开 快捷发宏 窗口" });
-        Svc.Commands.AddHandler("/RB tp", new CommandInfo(OnCommand) { HelpMessage = "打开 随心而行 窗口" });
+        Svc.Commands.AddHandler("/rb", new CommandInfo(OnCommand) { HelpMessage = HelpMessage });
+        Svc.Commands.AddHandler("/rb mqs", new CommandInfo(OnCommand) { HelpMessage = "打开 快捷发宏 窗口" });
+        Svc.Commands.AddHandler("/rb tp", new CommandInfo(OnCommand) { HelpMessage = "打开 随心而行 窗口" });
     }
 
     public void Dispose()
     {
         Svc.Commands.RemoveHandler("/riverbox");
-        Svc.Commands.RemoveHandler("/RB");
-        Svc.Commands.RemoveHandler("/RB mqs");
-        Svc.Commands.RemoveHandler("/RB tp");
+        Svc.Commands.RemoveHandler("/rb");
+        Svc.Commands.RemoveHandler("/rb mqs");
+        Svc.Commands.RemoveHandler("/rb tp");
 
         _uiWindow.Dispose();
         ECommonsMain.Dispose();
