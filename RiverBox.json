@@ -4,7 +4,7 @@
         "Name": "RiverBox",
         "InternalName": "RiverBox",
         "Description": "RiverBox 自用插件",
-        "AssemblyVersion": "1.0.7.0",
+        "AssemblyVersion": "1.0.7.1",
         "RepoUrl": "https://github.com/Whswa-river/River",
         "ApplicableVersion": "any",
         "DalamudApiLevel": 15,
@@ -15,8 +15,8 @@
             "大海"
         ],
         "IconUrl": "https://raw.githubusercontent.com/Whswa-river/River/main/RiverBox/icon.png",
-        "DownloadLinkInstall": "https://github.com/Whswa-river/River/releases/download/1.0.7.0/RiverBox.zip",
-        "DownloadLinkTesting": "https://github.com/Whswa-river/River/releases/download/1.0.7.0/RiverBox.zip",
-        "DownloadLinkUpdate": "https://github.com/Whswa-river/River/releases/download/1.0.7.0/RiverBox.zip"
+        "DownloadLinkInstall": "https://github.com/Whswa-river/River/releases/download/1.0.7.1/RiverBox.zip",
+        "DownloadLinkTesting": "https://github.com/Whswa-river/River/releases/download/1.0.7.1/RiverBox.zip",
+        "DownloadLinkUpdate": "https://github.com/Whswa-river/River/releases/download/1.0.7.1/RiverBox.zip"
     }
 ]
