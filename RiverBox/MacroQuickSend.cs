@@ -158,7 +158,7 @@ ImGui.TextColored(AccentColor, "快捷发宏");
                 ImGui.Indent(10f);
 
                 const float btnWidth = 80f;
-                const int cols = 4;
+                const int cols = 3;
 
                 for (int i = 0; i < group.Macros.Count; i++)
                 {
