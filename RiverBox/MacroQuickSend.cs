@@ -224,12 +224,6 @@ ImGui.TextColored(AccentColor, "快捷发宏");
 
         ImGui.Spacing();
 
-        bool showNotifications = _config.ShowNotifications;
-        if (ImGui.Checkbox("聊天通知", ref showNotifications))
-        { _config.ShowNotifications = showNotifications; SaveConfig(_config); }
-
-        ImGui.Spacing();
-
         int lineDelay = _config.LineDelayMs;
         ImGui.SetNextItemWidth(200);
         if (ImGui.SliderInt("多行发送间隔(ms)", ref lineDelay, 0, 2000))
@@ -592,7 +586,6 @@ ImGui.TextColored(AccentColor, "快捷发宏");
         public bool ModuleEnabled { get; set; } = false;
         public List<MacroGroup> Groups { get; set; } = new();
         public int SelectedGroup { get; set; } = 0;
-        public bool ShowNotifications { get; set; } = true;
         public int LineDelayMs { get; set; } = 300;
         public HashSet<int> CollapsedGroupIndices { get; set; } = new();
     }

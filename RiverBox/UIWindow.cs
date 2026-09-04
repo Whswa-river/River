@@ -12,7 +12,7 @@ namespace RiverBox;
 public sealed class UIWindow : IDisposable
 {
     private const string Title = "RiverBox";
-    private const string Version = "v1.0.7.1";
+    private const string Version = "v1.0.8.0";
 
     private static readonly Vector4 AccentColor = new(0f, 1f, 1f, 1f);          // 霓虹青
     private static readonly Vector4 PrimaryText = new(0.9f, 0.95f, 1f, 1f);      // 亮白偏蓝
@@ -54,6 +54,7 @@ public sealed class UIWindow : IDisposable
     private readonly MacroQuickSend _macroQuickSend;
     private readonly SubmarineCollect _submarineCollect;
     private readonly TeleportManager _teleportManager;
+    private readonly FieldMarkerMover _fieldMarkerMover;
 
     private readonly string[] _tabs =
     {
@@ -62,7 +63,7 @@ public sealed class UIWindow : IDisposable
 
     private readonly string[][] _featuresByTab =
     {
-        new[] { "快捷发宏", "随心而行" },
+        new[] { "快捷发宏", "随心而行", "场地传送" },
         new[] { "插件管理" },
         new[] { "自动收艇" },
     };
@@ -72,6 +73,7 @@ public sealed class UIWindow : IDisposable
         _macroQuickSend = new MacroQuickSend();
         _submarineCollect = new SubmarineCollect();
         _teleportManager = new TeleportManager();
+        _fieldMarkerMover = new FieldMarkerMover();
     }
 
     public bool Visible => _visible;
@@ -81,6 +83,10 @@ public sealed class UIWindow : IDisposable
     public void ToggleMacroFloating() => _macroQuickSend.ToggleFloatingWindow();
 
     public void ToggleTeleportFloating() => _teleportManager.ToggleFloating();
+
+    public void ToggleFieldMarkerFloating() => _fieldMarkerMover.ToggleFloating();
+
+    public void MoveToFieldMarker(string marker) => _fieldMarkerMover.MoveToByName(marker);
 
     public void Draw()
     {
@@ -141,6 +147,7 @@ public sealed class UIWindow : IDisposable
             }
 
             _teleportManager.DrawFloatingWindow();
+            _fieldMarkerMover.DrawFloatingWindow();
         }
         finally
         {
@@ -239,6 +246,12 @@ public sealed class UIWindow : IDisposable
             if (_selectedFeature == 1)
             {
                 _teleportManager.DrawConfig();
+                return;
+            }
+
+            if (_selectedFeature == 2)
+            {
+                _fieldMarkerMover.Draw();
                 return;
             }
 
@@ -752,5 +765,6 @@ public sealed class UIWindow : IDisposable
         _macroQuickSend?.Dispose();
         _submarineCollect?.Dispose();
         _teleportManager?.Dispose();
+        _fieldMarkerMover?.Dispose();
     }
 }
