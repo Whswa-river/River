@@ -1,0 +1,16 @@
+{
+  "Author": "River",
+  "Name": "AllPotPredictor",
+  "InternalName": "AllPotPredictor",
+  "Description": "全大区魔法罐预测 - 同时连接四大区众包网，汇总显示所有活跃实例的魔法罐预测时间",
+  "AssemblyVersion": "1.0.0.0",
+  "RepoUrl": "https://github.com/Whswa-river/River",
+  "ApplicableVersion": "any",
+  "DalamudApiLevel": 15,
+  "TestingDalamudApiLevel": 15,
+  "Tags": ["fate", "魔法罐", "预测", "众包"],
+  "IconUrl": "https://raw.githubusercontent.com/Whswa-river/River/main/AllPotPredictor/icon.png",
+  "DownloadLinkInstall": "https://github.com/Whswa-river/River/releases/download/AllPotPredictor-1.0.0.0/AllPotPredictor.zip",
+  "DownloadLinkTesting": "https://github.com/Whswa-river/River/releases/download/AllPotPredictor-1.0.0.0/AllPotPredictor.zip",
+  "DownloadLinkUpdate": "https://github.com/Whswa-river/River/releases/download/AllPotPredictor-1.0.0.0/AllPotPredictor.zip"
+}
