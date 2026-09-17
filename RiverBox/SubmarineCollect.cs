@@ -569,10 +569,18 @@ public class SubmarineCollect : IDisposable
                     }
 
                     ImGui.TableNextColumn();
-                    if (ImGui.SmallButton($"删除##{i}"))
+                    bool ctrlHeld = ImGui.GetIO().KeyCtrl;
+                    if (ImGui.SmallButton(ctrlHeld ? $"删除##{i}" : $"删除(Ctrl)##{i}"))
                     {
-                        _config.RemovePreset(preset.CharacterName, preset.WorldName);
-                        i--;
+                        if (ctrlHeld)
+                        {
+                            _config.RemovePreset(preset.CharacterName, preset.WorldName);
+                            i--;
+                        }
+                    }
+                    if (ImGui.IsItemHovered() && !ctrlHeld)
+                    {
+                        ImGui.SetTooltip("需要按住 Ctrl 才能删除，防止误触");
                     }
                 }
 

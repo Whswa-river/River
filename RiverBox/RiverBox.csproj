@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Dalamud.NET.Sdk/15.0.0">
 
   <PropertyGroup>
-    <Version>1.0.8.0</Version>
-    <Author>River</Author>
+    <Version>1.0.10.0</Version>
+    <Author>SFY</Author>
     <Name>RiverBox</Name>
     <InternalName>RiverBox</InternalName>
     <Punchline>RiverBox 自用插件</Punchline>
