@@ -42,3 +42,7 @@ RiverBox.zip
 ehthumbs.db
 Thumbs.db
 nul
+
+# Python
+__pycache__/
+*.pyc
