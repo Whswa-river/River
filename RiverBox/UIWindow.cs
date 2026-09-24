@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Plugin.Services;
 using ECommons.Automation;
 using ECommons.DalamudServices;
 using Player = ECommons.GameHelpers.LegacyPlayer.Player;
@@ -419,10 +420,18 @@ public sealed class UIWindow : IDisposable
                     ImGui.TextColored(SecondaryText, "暂无数据，收艇后自动填充");
                 }
 
-                if (ImGui.SmallButton("删除"))
+                bool ctrlHeld = ImGui.GetIO().KeyCtrl;
+                if (ImGui.SmallButton(ctrlHeld ? "删除" : "删除(Ctrl)"))
                 {
-                    _submarineCollect.Config.RemovePreset(preset.CharacterName, preset.WorldName);
-                    i--;
+                    if (ctrlHeld)
+                    {
+                        _submarineCollect.Config.RemovePreset(preset.CharacterName, preset.WorldName);
+                        i--;
+                    }
+                }
+                if (ImGui.IsItemHovered() && !ctrlHeld)
+                {
+                    ImGui.SetTooltip("需要按住 Ctrl 才能删除，防止误触");
                 }
                 ImGui.SameLine();
                 if (i > 0)

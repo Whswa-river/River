@@ -11,10 +11,7 @@ public class SubmarineConfig
 {
     public List<CharacterPreset> CharacterPresets { get; set; } = [];
     public List<SubmarineCacheData> CharacterCaches { get; set; } = [];
-    public bool AutoCollectEnabled { get; set; } = false;
-    public int DelayAfterRelogMs { get; set; } = 3000;
     public int DelayBetweenCallbacksMs { get; set; } = 500;
-    public int DelayAfterCollectMs { get; set; } = 2000;
 
     private static string GetConfigPath()
     {

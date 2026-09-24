@@ -69,7 +69,6 @@ public class MacroQuickSend : IDisposable
     }
 
     private static Config _config = new();
-    private static bool _showFloating;
     private static bool _drawing;
     private static string _importMessage = "";
     private static DateTime _importMessageTime = DateTime.MinValue;
@@ -86,7 +85,7 @@ public class MacroQuickSend : IDisposable
     private static readonly Vector4 WarningColor = new(1f, 0.8f, 0.2f, 1f);
 
     public bool Enabled => _config.ModuleEnabled;
-    public bool ShowFloating => _showFloating;
+    public bool ShowFloating => _config.ShowFloating;
 
     public MacroQuickSend()
     {
@@ -101,7 +100,7 @@ public class MacroQuickSend : IDisposable
 
     private static void OnDraw()
     {
-        if (!_showFloating || _drawing) return;
+        if (!_config.ShowFloating || _drawing) return;
 
         _drawing = true;
         try
@@ -123,9 +122,10 @@ public class MacroQuickSend : IDisposable
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(12, 8));
             ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 6f);
 
+            var show = _config.ShowFloating;
             ImGui.Begin(
                 "##MQS Floating",
-                ref _showFloating,
+                ref show,
                 ImGuiWindowFlags.AlwaysAutoResize |
                 ImGuiWindowFlags.NoTitleBar |
                 ImGuiWindowFlags.NoScrollbar);
@@ -187,7 +187,14 @@ ImGui.TextColored(AccentColor, "快捷发宏");
 
             ImGui.PopStyleVar(3);
             ImGui.PopStyleColor(10);
+
+            if (!show)
+                _config.ShowFloating = false;
+
             ImGui.End();
+
+            if (!show)
+                SaveConfig(_config);
         }
         finally
         {
@@ -199,10 +206,12 @@ ImGui.TextColored(AccentColor, "快捷发宏");
     {
         if (!_config.ModuleEnabled)
         {
-            _showFloating = false;
+            _config.ShowFloating = false;
+            SaveConfig(_config);
             return;
         }
-        _showFloating = !_showFloating;
+        _config.ShowFloating = !_config.ShowFloating;
+        SaveConfig(_config);
     }
 
     public void DrawConfig()
@@ -237,10 +246,13 @@ ImGui.TextColored(AccentColor, "快捷发宏");
         if (!_config.ModuleEnabled)
             ImGui.BeginDisabled();
 
-        if (ImGui.Button(_showFloating ? "关闭悬浮窗" : "打开悬浮窗", new Vector2(150, 34)))
+        if (ImGui.Button(_config.ShowFloating ? "关闭悬浮窗" : "打开悬浮窗", new Vector2(150, 34)))
         {
             if (_config.ModuleEnabled)
-                _showFloating = !_showFloating;
+            {
+                _config.ShowFloating = !_config.ShowFloating;
+                SaveConfig(_config);
+            }
         }
 
         if (!_config.ModuleEnabled)
@@ -584,6 +596,7 @@ ImGui.TextColored(AccentColor, "快捷发宏");
     private class Config
     {
         public bool ModuleEnabled { get; set; } = false;
+        public bool ShowFloating { get; set; } = false;
         public List<MacroGroup> Groups { get; set; } = new();
         public int SelectedGroup { get; set; } = 0;
         public int LineDelayMs { get; set; } = 300;

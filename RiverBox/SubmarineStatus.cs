@@ -6,25 +6,6 @@ namespace RiverBox;
 
 public static class SubmarineStatus
 {
-    public static unsafe long GetLatestReturnTime()
-    {
-        var territory = HousingManager.Instance()->WorkshopTerritory;
-        if (territory == null)
-            return 0;
-
-        long latest = 0;
-        var data = territory->Submersible.Data;
-        for (int i = 0; i < data.Length; i++)
-        {
-            var sub = data[i];
-            if (sub.RankId == 0)
-                continue;
-            if (sub.ReturnTime > latest)
-                latest = sub.ReturnTime;
-        }
-        return latest;
-    }
-
     public static unsafe List<SubmarineVesselInfo> GetVesselData()
     {
         var result = new List<SubmarineVesselInfo>();
@@ -50,13 +31,6 @@ public static class SubmarineStatus
             });
         }
         return result;
-    }
-
-    public static string FormatTime(long unixSeconds)
-    {
-        if (unixSeconds <= 0)
-            return "-";
-        return DateTimeOffset.FromUnixTimeSeconds(unixSeconds).ToLocalTime().ToString("yyyy/M/d HH:mm:ss");
     }
 
     public static string FormatArrival(long unixSeconds)

@@ -17,18 +17,14 @@ public sealed class FieldMarkerMover : IDisposable
     private static readonly Vector4 PrimaryText = new(0.9f, 0.95f, 1f, 1f);
     private static readonly Vector4 SecondaryText = new(0.5f, 0.7f, 0.8f, 0.8f);
     private static readonly Vector4 SuccessColor = new(0.2f, 1f, 0.4f, 1f);
-    private static readonly Vector4 WarningColor = new(1f, 0.8f, 0.2f, 1f);
     private static readonly Vector4 WindowBg = new(0.03f, 0.02f, 0.06f, 0.97f);
     private static readonly Vector4 BorderGlow = new(0f, 0.8f, 1f, 0.3f);
     private static readonly Vector4 BtnBgNormal = new(0.08f, 0.06f, 0.14f, 0.9f);
-    private static readonly Vector4 NeonPurple = new(0.6f, 0.2f, 1f, 1f);
 
     private bool _isMoving;
     private int _selectedMarker = -1;
     private bool _floatingVisible;
     private bool _drawing;
-
-    public bool FloatingVisible => _floatingVisible;
 
     public void Dispose()
     {
@@ -36,7 +32,6 @@ public sealed class FieldMarkerMover : IDisposable
     }
 
     public void ToggleFloating() => _floatingVisible = !_floatingVisible;
-    public void OpenFloating() => _floatingVisible = true;
 
     public void MoveTo(Vector3 pos)
     {
