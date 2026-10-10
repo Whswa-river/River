@@ -1,9 +1,10 @@
 [
     {
-        "Author": "River",
+        "Author": "SFY",
         "Name": "RiverBox",
         "InternalName": "RiverBox",
         "Description": "RiverBox 自用插件",
+        "Punchline": "自用工具箱",
         "AssemblyVersion": "1.0.11.1",
         "RepoUrl": "https://github.com/Whswa-river/River",
         "ApplicableVersion": "any",

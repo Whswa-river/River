@@ -46,3 +46,7 @@ nul
 # Python
 __pycache__/
 *.pyc
+
+# Release scripts (local only)
+release.py
+release_*.py
