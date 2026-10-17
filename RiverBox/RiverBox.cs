@@ -12,7 +12,7 @@ public sealed class RiverBox : IDalamudPlugin
 {
     public string Name => "RiverBox";
 
-    private const string HelpMessage = "打开 RiverBox 界面 | /rb mqs 快捷发宏 | /rb tpm 随心而行 | /rb mk [A-D/1-4] 场地标点";
+    private const string HelpMessage = "打开 RiverBox 界面 | /rb mqs 快捷发宏 | /rb tpm 随心而行 | /rb mk [A-D/1-4] 场地标点 | /rb 收艇 开始收艇";
 
     public static RiverBox P { get; private set; } = null!;
     public static RiverBoxConfig C { get; private set; } = null!;
@@ -42,6 +42,7 @@ public sealed class RiverBox : IDalamudPlugin
         Svc.Commands.AddHandler("/rb mqs", new CommandInfo(OnCommand) { HelpMessage = "打开 快捷发宏 窗口" });
         Svc.Commands.AddHandler("/rb tpm", new CommandInfo(OnCommand) { HelpMessage = "打开 随心而行 窗口" });
         Svc.Commands.AddHandler("/rb mk", new CommandInfo(OnCommand) { HelpMessage = "打开 场地标点 窗口" });
+        Svc.Commands.AddHandler("/rb 收艇", new CommandInfo(OnCommand) { HelpMessage = "执行开始收艇" });
     }
 
     public void Dispose()
@@ -51,6 +52,7 @@ public sealed class RiverBox : IDalamudPlugin
         Svc.Commands.RemoveHandler("/rb mqs");
         Svc.Commands.RemoveHandler("/rb tpm");
         Svc.Commands.RemoveHandler("/rb mk");
+        Svc.Commands.RemoveHandler("/rb 收艇");
 
         _uiWindow.Dispose();
         ECommonsMain.Dispose();
@@ -70,6 +72,8 @@ public sealed class RiverBox : IDalamudPlugin
             var marker = args.Substring(3).Trim();
             _uiWindow.MoveToFieldMarker(marker);
         }
+        else if (args.Equals("收艇", System.StringComparison.Ordinal))
+            _uiWindow.StartSubmarineCollect();
         else
             _uiWindow.Toggle();
     }

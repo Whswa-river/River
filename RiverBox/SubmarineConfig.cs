@@ -99,6 +99,8 @@ public class SubmarineConfig
 
         if (existing != null)
         {
+            if (VesselsEqual(existing.Vessels, vessels))
+                return;
             existing.Vessels = vessels;
             existing.LastUpdateTime = DateTime.Now;
         }
@@ -113,6 +115,41 @@ public class SubmarineConfig
             });
         }
         Save();
+    }
+
+    public void UpdateItemCounts(string characterName, string worldName, int repair, int ceruleum)
+    {
+        var existing = GetCache(characterName, worldName);
+        if (existing == null)
+        {
+            existing = new SubmarineCacheData
+            {
+                CharacterName = characterName,
+                WorldName = worldName
+            };
+            CharacterCaches.Add(existing);
+        }
+
+        bool changed = existing.RepairMaterialCount != repair || existing.CeruleumCount != ceruleum;
+        bool timeStale = (DateTime.Now - existing.ItemsUpdateTime).TotalSeconds > 30;
+        if (!changed && !timeStale)
+            return;
+
+        existing.RepairMaterialCount = repair;
+        existing.CeruleumCount = ceruleum;
+        existing.ItemsUpdateTime = DateTime.Now;
+        Save();
+    }
+
+    private static bool VesselsEqual(List<SubmarineVesselInfo> a, List<SubmarineVesselInfo> b)
+    {
+        if (a.Count != b.Count) return false;
+        for (int i = 0; i < a.Count; i++)
+        {
+            if (a[i].Name != b[i].Name || a[i].Level != b[i].Level || a[i].ReturnTime != b[i].ReturnTime)
+                return false;
+        }
+        return true;
     }
 
     public SubmarineCacheData? GetCache(string characterName, string worldName)
@@ -142,6 +179,9 @@ public class SubmarineCacheData
     public string WorldName { get; set; } = "";
     public List<SubmarineVesselInfo> Vessels { get; set; } = [];
     public DateTime LastUpdateTime { get; set; } = DateTime.MinValue;
+    public int? RepairMaterialCount { get; set; }
+    public int? CeruleumCount { get; set; }
+    public DateTime ItemsUpdateTime { get; set; } = DateTime.MinValue;
 
     [JsonIgnore]
     public string FullName => $"{CharacterName}@{WorldName}";

@@ -201,6 +201,10 @@ public class SubmarineCollect : IDisposable
             UpdateStatus($"已缓存 {preset.FullName} 的 {vessels.Count} 艘潜艇数据 ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
         }
 
+        var counts = SubmarineStatus.GetInventoryCounts();
+        if (counts.HasValue)
+            _config.UpdateItemCounts(preset.CharacterName, preset.WorldName, counts.Value.Repair, counts.Value.Ceruleum);
+
         _stateTimer.Restart();
         _closingWatch.Reset();
         SkipToNextCharacter();

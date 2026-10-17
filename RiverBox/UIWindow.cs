@@ -13,7 +13,7 @@ namespace RiverBox;
 public sealed class UIWindow : IDisposable
 {
     private const string Title = "RiverBox";
-    private const string Version = "v1.0.8.0";
+    private const string Version = "v1.0.12.0";
 
     private static readonly Vector4 AccentColor = new(0f, 1f, 1f, 1f);          // 霓虹青
     private static readonly Vector4 PrimaryText = new(0.9f, 0.95f, 1f, 1f);      // 亮白偏蓝
@@ -88,6 +88,8 @@ public sealed class UIWindow : IDisposable
     public void ToggleFieldMarkerFloating() => _fieldMarkerMover.ToggleFloating();
 
     public void MoveToFieldMarker(string marker) => _fieldMarkerMover.MoveToByName(marker);
+
+    public void StartSubmarineCollect() => _submarineCollect.StartCollecting();
 
     public void Draw()
     {
@@ -324,6 +326,10 @@ public sealed class UIWindow : IDisposable
                 var vessels = SubmarineStatus.GetVesselData();
                 if (vessels.Count > 0)
                     _submarineCollect.Config.UpdateCache(preset.CharacterName, preset.WorldName, vessels);
+
+                var counts = SubmarineStatus.GetInventoryCounts();
+                if (counts.HasValue)
+                    _submarineCollect.Config.UpdateItemCounts(preset.CharacterName, preset.WorldName, counts.Value.Repair, counts.Value.Ceruleum);
             }
         }
 
@@ -352,6 +358,13 @@ public sealed class UIWindow : IDisposable
                     headerLabel += "  |  全部完成";
             }
 
+            if (cache != null)
+            {
+                var repair = cache.RepairMaterialCount?.ToString() ?? "-";
+                var ceruleum = cache.CeruleumCount?.ToString() ?? "-";
+                headerLabel += $"  |  修理材料: {repair}    青磷水: {ceruleum}";
+            }
+
             ImGui.PushID(i);
 
             bool enabled = preset.Enabled;
@@ -364,10 +377,13 @@ public sealed class UIWindow : IDisposable
             ImGui.PopStyleColor();
             ImGui.SameLine();
 
-            if (ImGui.CollapsingHeader($"{headerLabel}###sub_{i}"))
+            bool headerOpen = ImGui.CollapsingHeader($"{headerLabel}###sub_{i}");
+            if (ImGui.IsItemHovered() && cache != null && cache.ItemsUpdateTime > DateTime.MinValue)
+                ImGui.SetTooltip($"物品数量快照: {cache.ItemsUpdateTime:yyyy-MM-dd HH:mm}\n离线角色显示的是上次收艇/登录时的数量");
+
+            if (headerOpen)
             {
                 ImGui.Indent(10f);
-
                 if (cache != null && cache.Vessels.Count > 0)
                 {
                     if (ImGui.BeginTable($"##vesselTable_{i}", 4, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
