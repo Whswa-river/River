@@ -8,7 +8,7 @@ SFY 的 FFXIV Dalamud 插件仓库。
 |------|------|---------|
 | **AutomaticHunting** | 自动狩猎跟车 — 监听车头 Flag，自动导航到狩猎目标 | 2.2.69.0 |
 | **AllPotPredictor** | 全大区魔法罐预测 — 汇总四大区众包网的魔法罐预测时间 | 1.4.2.0 |
-| **RiverBox** | 自用工具箱 — 自动收艇、随心而行、场地标点导航、插件管理 | 1.0.11.1 |
+| **RiverBox** | 自用工具箱 — 自动收艇、随心而行、场地标点导航、插件管理 | 1.0.12.0 |
 
 > 版本号可能滞后，以 [Releases](https://github.com/Whswa-river/River/releases) 为准。
 
