@@ -4,7 +4,7 @@
     "InternalName": "AutomaticHunting",
     "Description": "自动狩猎跟车 - 监听车头Flag，自动导航到狩猎目标",
     "Punchline": "自动狩猎跟车",
-    "AssemblyVersion": "2.2.69.0",
+    "AssemblyVersion": "2.2.71.0",
     "RepoUrl": "https://github.com/Whswa-river/River",
     "ApplicableVersion": "any",
     "DalamudApiLevel": 15,
@@ -15,7 +15,7 @@
         "自动跟车"
     ],
     "IconUrl": "https://raw.githubusercontent.com/Whswa-river/River/main/AutomaticHunting/icon.png",
-    "DownloadLinkInstall": "https://github.com/Whswa-river/River/releases/download/AutomaticHunting-2.2.69.0/AutomaticHunting.zip",
-    "DownloadLinkTesting": "https://github.com/Whswa-river/River/releases/download/AutomaticHunting-2.2.69.0/AutomaticHunting.zip",
-    "DownloadLinkUpdate": "https://github.com/Whswa-river/River/releases/download/AutomaticHunting-2.2.69.0/AutomaticHunting.zip"
+    "DownloadLinkInstall": "https://github.com/Whswa-river/River/releases/download/AutomaticHunting-2.2.71.0/AutomaticHunting.zip",
+    "DownloadLinkTesting": "https://github.com/Whswa-river/River/releases/download/AutomaticHunting-2.2.71.0/AutomaticHunting.zip",
+    "DownloadLinkUpdate": "https://github.com/Whswa-river/River/releases/download/AutomaticHunting-2.2.71.0/AutomaticHunting.zip"
 }
