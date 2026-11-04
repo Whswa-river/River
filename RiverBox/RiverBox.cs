@@ -25,13 +25,20 @@ public sealed class RiverBox : IDalamudPlugin
     [PluginService] internal static ICondition Condition { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
 
+    private readonly IDalamudPluginInterface _pluginInterface;
     private readonly UIWindow _uiWindow;
 
     public RiverBox(IDalamudPluginInterface pluginInterface)
     {
+        _pluginInterface = pluginInterface;
         P = this;
         ECommonsMain.Init(pluginInterface, this, Module.ObjectFunctions, Module.DalamudReflector);
         C = EzConfig.Init<RiverBoxConfig>();
+        // 旧配置文件里若为 null，反序列化会覆盖字段默认值。
+        C.PluginCustomNames ??= [];
+        C.PluginGroups ??= [];
+        C.PluginPinnedOrder ??= [];
+        C.FieldMarkerTpCommand ??= "";
 
         _uiWindow = new UIWindow();
         pluginInterface.UiBuilder.Draw += Draw;
@@ -56,6 +63,11 @@ public sealed class RiverBox : IDalamudPlugin
         Svc.Commands.RemoveHandler("/rb 收艇");
         Svc.Commands.RemoveHandler("/rb 切号");
 
+        // 必须解绑，否则插件卸载/重载后 Dalamud 仍持有旧实例的两个委托，
+        // 继续调用已 Dispose 的 UIWindow。
+        _pluginInterface.UiBuilder.Draw -= Draw;
+        _pluginInterface.UiBuilder.OpenConfigUi -= Toggle;
+
         _uiWindow.Dispose();
         ECommonsMain.Dispose();
     }
@@ -63,6 +75,13 @@ public sealed class RiverBox : IDalamudPlugin
     private void OnCommand(string command, string arguments)
     {
         var args = arguments.Trim();
+
+        // Dalamud 只按首个空格切分命令，所以 "/rb mqs" 这类注册实际不会命中，
+        // 子命令总是作为 arguments 传进来。若将来匹配规则变为最长前缀，
+        // 这些 handler 会收到空 arguments，这里做兼容以免所有子命令突然失效。
+        if (args.Length == 0 && command.StartsWith("/rb ", System.StringComparison.OrdinalIgnoreCase))
+            args = command.Substring(4).Trim();
+
         if (args.Equals("mqs", System.StringComparison.OrdinalIgnoreCase))
             _uiWindow.ToggleMacroFloating();
         else if (args.Equals("tpm", System.StringComparison.OrdinalIgnoreCase))

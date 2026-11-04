@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Plugin.Services;
 using ECommons.Automation;
 using ECommons.DalamudServices;
 using ECommons.GameHelpers;
@@ -27,6 +28,15 @@ public class TeleportManager : IDisposable
     private bool _needOpenEditPopup;
     private string _importMessage = "";
     private DateTime _importMessageTime = DateTime.MinValue;
+
+    // 传送等待改为 Framework.Update 驱动，避免在后台线程调用游戏主线程 API。
+    private enum TeleportPhase { Idle, WaitingTerritory, WaitingReady, WaitingFinal }
+    private TeleportPhase _tpPhase = TeleportPhase.Idle;
+    private TeleportButtonData? _tpButton;
+    private uint _tpTargetTerritory;
+    private uint _tpOriginTerritory;
+    private long _tpDeadline;
+    private long _tpFinalAt;
 
     private static readonly Vector4 WindowBg = new(0.03f, 0.02f, 0.06f, 0.97f);
     private static readonly Vector4 AccentColor = new(0f, 1f, 1f, 1f);
@@ -47,6 +57,7 @@ public class TeleportManager : IDisposable
     {
         _config = LoadConfig();
         EnsureSpecialSceneGroup();
+        Svc.Framework.Update += OnFrameworkUpdate;
     }
 
     private static readonly (string Code, string Name)[] SpecialScenes = new[]
@@ -83,6 +94,8 @@ public class TeleportManager : IDisposable
     private static extern IntPtr GlobalLock(IntPtr hMem);
     [DllImport("kernel32.dll")]
     private static extern bool GlobalUnlock(IntPtr hMem);
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalFree(IntPtr hMem);
 
     private const uint CF_UNICODETEXT = 13;
     private const uint GMEM_MOVEABLE = 0x0002;
@@ -90,15 +103,34 @@ public class TeleportManager : IDisposable
     private static void SetClipboardText(string text)
     {
         if (string.IsNullOrEmpty(text)) return;
-        OpenClipboard(0);
-        EmptyClipboard();
-        var bytes = Encoding.Unicode.GetBytes(text + "\0");
-        var hMem = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)bytes.Length);
-        var dest = GlobalLock(hMem);
-        Marshal.Copy(bytes, 0, dest, bytes.Length);
-        GlobalUnlock(hMem);
-        SetClipboardData(CF_UNICODETEXT, hMem);
-        CloseClipboard();
+        if (!OpenClipboard(0)) return;
+
+        try
+        {
+            if (!EmptyClipboard()) return;
+
+            var bytes = Encoding.Unicode.GetBytes(text + "\0");
+            var hMem = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)bytes.Length);
+            if (hMem == IntPtr.Zero) return;
+
+            var dest = GlobalLock(hMem);
+            if (dest == IntPtr.Zero)
+            {
+                GlobalFree(hMem);
+                return;
+            }
+
+            Marshal.Copy(bytes, 0, dest, bytes.Length);
+            GlobalUnlock(hMem);
+
+            // 成功后内存所有权移交系统，不能再 GlobalFree；失败才需要释放。
+            if (SetClipboardData(CF_UNICODETEXT, hMem) == IntPtr.Zero)
+                GlobalFree(hMem);
+        }
+        finally
+        {
+            CloseClipboard();
+        }
     }
 
     private static string GetClipboardText()
@@ -145,7 +177,11 @@ public class TeleportManager : IDisposable
             SaveConfig();
         }
     }
-    public void Dispose() { }
+    public void Dispose()
+    {
+        Svc.Framework.Update -= OnFrameworkUpdate;
+        CancelPendingTeleport();
+    }
     public void ToggleFloating() => _floatingVisible = !_floatingVisible;
     public void OpenFloating() => _floatingVisible = true;
 
@@ -226,6 +262,7 @@ public class TeleportManager : IDisposable
     {
         if (!_floatingVisible || _drawing) return;
         _drawing = true;
+        var begun = false;
         try
         {
             ImGui.PushStyleColor(ImGuiCol.WindowBg, WindowBg);
@@ -244,6 +281,7 @@ public class TeleportManager : IDisposable
 
             ImGui.Begin("##TeleportFloating", ref _floatingVisible,
                 ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoTitleBar);
+            begun = true;
 
             ImGui.TextColored(AccentColor, "随心而行");
             ImGui.Separator();
@@ -272,12 +310,15 @@ public class TeleportManager : IDisposable
                 ImGui.Spacing();
             }
             if (!any) ImGui.TextColored(SecondaryText, "无显示按钮");
-
-            ImGui.PopStyleVar(3);
-            ImGui.PopStyleColor(9);
-            ImGui.End();
         }
-        finally { _drawing = false; }
+        finally
+        {
+            if (begun)
+                ImGui.End();
+            ImGui.PopStyleVar(3);
+            ImGui.PopStyleColor(10); // 与上方 10 个 PushStyleColor 配对（原为 9，每帧泄漏 1 个）
+            _drawing = false;
+        }
     }
 
     public void DrawConfig()
@@ -383,14 +424,17 @@ public class TeleportManager : IDisposable
 
                     ImGui.SameLine();
                     ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.5f, 0.1f, 0.1f, 0.8f));
-                    if (ImGui.SmallButton("删除分组"))
+                    var deleteGroup = ImGui.SmallButton("删除分组");
+                    ImGui.PopStyleColor(1);
+                    if (deleteGroup)
                     {
                         _config.Groups.RemoveAt(g);
                         SaveConfig();
+                        // 提前 return 前补齐 ImGui 栈，否则每次删分组都会累积一次失衡。
+                        ImGui.Unindent(10f);
                         ImGui.PopID();
                         return;
                     }
-                    ImGui.PopStyleColor(1);
 
                     if (!string.IsNullOrEmpty(_importMessage) && (DateTime.Now - _importMessageTime).TotalSeconds < 2)
                     {
@@ -468,16 +512,20 @@ public class TeleportManager : IDisposable
                             }
                             ImGui.Separator();
                             ImGui.PushStyleColor(ImGuiCol.Text, WarningColor);
-                            if (ImGui.MenuItem("删除"))
+                            var deleteButton = ImGui.MenuItem("删除");
+                            ImGui.PopStyleColor(1);
+                            if (deleteButton)
                             {
                                 group.Buttons.RemoveAt(b);
                                 SaveConfig();
-                                ImGui.PopStyleColor(1);
+                                // 提前 return 前补齐 ImGui 栈（StyleVar / Indent / 两级 ID）。
                                 ImGui.EndPopup();
+                                ImGui.PopID();
+                                ImGui.PopStyleVar();
+                                ImGui.Unindent(10f);
                                 ImGui.PopID();
                                 return;
                             }
-                            ImGui.PopStyleColor(1);
                         }
                         ImGui.EndPopup();
                     }
@@ -607,38 +655,75 @@ public class TeleportManager : IDisposable
             return;
         }
 
-        Task.Run(() => TeleportAndWait(btn, targetTerritory, currentTerritory));
+        CancelPendingTeleport();
+        _tpButton = btn;
+        _tpTargetTerritory = targetTerritory;
+        _tpOriginTerritory = currentTerritory;
+        _tpDeadline = Environment.TickCount64 + 120000;
+        _tpPhase = TeleportPhase.WaitingTerritory;
+        Chat.ExecuteCommand($"/pdrtelepo {btn.AetheryteName}");
     }
 
-    private void TeleportAndWait(TeleportButtonData btn, uint targetTerritory, uint originTerritory)
+    /// <summary>
+    /// 原实现用 Task.Run + Thread.Sleep 轮询，并在后台线程调用 Chat.ExecuteCommand
+    /// （内部直接调用游戏 UIModule.ProcessChatBoxEntry）和 Svc.Condition / Player，
+    /// 这些 API 只能在游戏主线程使用。现改为 Framework.Update 驱动的状态机。
+    /// </summary>
+    private void OnFrameworkUpdate(IFramework framework)
     {
-        Chat.ExecuteCommand($"/pdrtelepo {btn.AetheryteName}");
+        if (_tpPhase == TeleportPhase.Idle || _tpButton == null)
+            return;
 
-        for (int i = 0; i < 1200; i++)
+        var now = Environment.TickCount64;
+        switch (_tpPhase)
         {
-            Thread.Sleep(100);
-            var current = (uint)Svc.ClientState.TerritoryType;
-            if (targetTerritory != 0)
+            case TeleportPhase.WaitingTerritory:
             {
-                if (current == targetTerritory) break;
-            }
-            else if (current != originTerritory)
-            {
+                var current = (uint)Svc.ClientState.TerritoryType;
+                var arrived = _tpTargetTerritory != 0
+                    ? current == _tpTargetTerritory
+                    : current != _tpOriginTerritory;
+                if (arrived)
+                {
+                    _tpDeadline = now + 60000;
+                    _tpPhase = TeleportPhase.WaitingReady;
+                }
+                else if (now > _tpDeadline)
+                {
+                    Svc.Log.Warning("[TeleportManager] 等待切换地图超时，已取消后续坐标传送");
+                    CancelPendingTeleport();
+                }
                 break;
             }
+            case TeleportPhase.WaitingReady:
+                if (Player.Available
+                    && !Svc.Condition[ConditionFlag.BetweenAreas]
+                    && !Svc.Condition[ConditionFlag.BetweenAreas51])
+                {
+                    _tpFinalAt = now + 500;
+                    _tpPhase = TeleportPhase.WaitingFinal;
+                }
+                else if (now > _tpDeadline)
+                {
+                    Svc.Log.Warning("[TeleportManager] 等待角色就绪超时，已取消后续坐标传送");
+                    CancelPendingTeleport();
+                }
+                break;
+            case TeleportPhase.WaitingFinal:
+                if (now < _tpFinalAt) break;
+                var btn = _tpButton;
+                CancelPendingTeleport();
+                Chat.ExecuteCommand($"/pdrtp pos {btn!.X} {btn.Y} {btn.Z}");
+                break;
         }
+    }
 
-        for (int i = 0; i < 600; i++)
-        {
-            Thread.Sleep(100);
-            if (!Player.Available) continue;
-            if (Svc.Condition[ConditionFlag.BetweenAreas] || Svc.Condition[ConditionFlag.BetweenAreas51]) continue;
-            break;
-        }
-
-        Thread.Sleep(500);
-
-        Chat.ExecuteCommand($"/pdrtp pos {btn.X} {btn.Y} {btn.Z}");
+    private void CancelPendingTeleport()
+    {
+        _tpPhase = TeleportPhase.Idle;
+        _tpButton = null;
+        _tpDeadline = 0;
+        _tpFinalAt = 0;
     }
 
     private static uint GetTerritoryByAetheryteName(string name)

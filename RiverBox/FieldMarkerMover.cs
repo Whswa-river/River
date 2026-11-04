@@ -28,15 +28,27 @@ public sealed class FieldMarkerMover : IDisposable
 
     public void Dispose()
     {
-        Stop();
+        // 插件卸载时只在实际导航中才发 /vnav stop，避免无意义的命令注入。
+        if (_isMoving)
+            Stop();
     }
 
     public void ToggleFloating() => _floatingVisible = !_floatingVisible;
 
     public void MoveTo(Vector3 pos)
     {
-        Svc.Commands.ProcessCommand($"/vnav moveto {pos.X} {pos.Y} {pos.Z}");
-        _isMoving = true;
+        var tp = RiverBox.C.FieldMarkerTpCommand?.Trim();
+        if (!string.IsNullOrEmpty(tp))
+        {
+            // 直接 TP 到位：指令后接 X Y Z（例如 /pdrtp pos X Y Z），无需 vnavmesh 导航
+            Svc.Commands.ProcessCommand($"{tp} {pos.X} {pos.Y} {pos.Z}");
+            _isMoving = false;
+        }
+        else
+        {
+            Svc.Commands.ProcessCommand($"/vnav moveto {pos.X} {pos.Y} {pos.Z}");
+            _isMoving = true;
+        }
     }
 
     public unsafe void MoveToByName(string name)
@@ -66,7 +78,9 @@ public sealed class FieldMarkerMover : IDisposable
 
     public void Stop()
     {
-        Svc.Commands.ProcessCommand("/vnav stop");
+        // 仅当使用 vnavmesh 导航时才需要停止；直接 TP 模式无需停止
+        if (string.IsNullOrWhiteSpace(RiverBox.C.FieldMarkerTpCommand))
+            Svc.Commands.ProcessCommand("/vnav stop");
         _isMoving = false;
         _selectedMarker = -1;
     }
@@ -75,6 +89,8 @@ public sealed class FieldMarkerMover : IDisposable
     {
         if (!_floatingVisible || _drawing) return;
         _drawing = true;
+        var pushed = false;
+        var begun = false;
         try
         {
             var controller = MarkingController.Instance();
@@ -93,9 +109,11 @@ public sealed class FieldMarkerMover : IDisposable
             ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 8f);
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(12, 8));
             ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(6, 4));
+            pushed = true;
 
             ImGui.Begin("##FieldMarkerFloating", ref _floatingVisible,
                 ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoTitleBar);
+            begun = true;
 
             ImGui.TextColored(AccentColor, "场地标点");
             ImGui.Separator();
@@ -141,19 +159,40 @@ public sealed class FieldMarkerMover : IDisposable
                 }
             }
 
-            ImGui.PopStyleVar(3);
-            ImGui.PopStyleColor(9);
-            ImGui.End();
         }
-        finally { _drawing = false; }
+        finally
+        {
+            if (begun)
+                ImGui.End();
+            if (pushed)
+            {
+                ImGui.PopStyleVar(3);
+                ImGui.PopStyleColor(10); // 与上方 10 个 PushStyleColor 配对（原为 9，每帧泄漏 1 个）
+            }
+            _drawing = false;
+        }
     }
 
     public unsafe void Draw()
     {
         ImGui.TextColored(AccentColor, "场地标点传送");
-        ImGui.TextColored(SecondaryText, "读取当前场地标点，使用 vnavmesh 导航到标点位置");
+        ImGui.TextColored(SecondaryText, "读取当前场地标点，使用 vnavmesh 或自定义 TP 指令抵达标点位置");
         ImGui.Separator();
 
+        ImGui.Spacing();
+
+        // TP 指令配置：留空走 vnavmesh，填入 TP 指令（如 /pdrtp pos）则直接传送
+        var tpCmd = RiverBox.C.FieldMarkerTpCommand ?? "";
+        ImGui.SetNextItemWidth(220f);
+        if (ImGui.InputText("TP 指令", ref tpCmd, 64))
+        {
+            RiverBox.C.FieldMarkerTpCommand = tpCmd;
+            RiverBox.C.Save();
+        }
+        ImGui.TextColored(SecondaryText, "留空使用 vnavmesh 导航；填入 TP 指令（如 /pdrtp pos）则直接传送，无需 vnavmesh");
+
+        ImGui.Spacing();
+        ImGui.Separator();
         ImGui.Spacing();
 
         if (ImGui.Button(_floatingVisible ? "关闭悬浮窗" : "打开悬浮窗", new Vector2(150, 30)))

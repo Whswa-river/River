@@ -65,6 +65,14 @@ public class SubmarineCollect : IDisposable
         if (!_isCollecting || _currentState == CollectState.Idle)
             return;
 
+        // 用户可能在收艇进行中删掉/重排预设，否则下面各状态会直接索引越界并每帧抛异常。
+        if (_currentPresetIndex < 0 || _currentPresetIndex >= _config.CharacterPresets.Count)
+        {
+            StopCollecting();
+            UpdateStatus("角色预设列表已变更，收艇已停止");
+            return;
+        }
+
         switch (_currentState)
         {
             case CollectState.Relogging:
@@ -183,7 +191,9 @@ public class SubmarineCollect : IDisposable
 
     private void HandleClosingUIState()
     {
-        if (_stateTimer.ElapsedMilliseconds < _config.DelayBetweenCallbacksMs)
+        // 配置被改成 0 或负数时会导致每帧刷 /pdr callback 指令，这里做下限保护。
+        var callbackDelay = Math.Clamp(_config.DelayBetweenCallbacksMs, 100, 5000);
+        if (_stateTimer.ElapsedMilliseconds < callbackDelay)
             return;
 
         _stateTimer.Restart();
@@ -303,9 +313,7 @@ public class SubmarineCollect : IDisposable
     {
         if (_currentPresetIndex >= _config.CharacterPresets.Count)
         {
-            UpdateStatus("所有角色收艇完成");
-            _isCollecting = false;
-            _currentState = CollectState.Idle;
+            FinishAndReturnToFirstCharacter();
             return;
         }
 
@@ -355,6 +363,40 @@ public class SubmarineCollect : IDisposable
 
         _stateTimer.Restart();
         _currentState = CollectState.Relogging;
+    }
+
+    /// <summary>
+    /// 全部收艇结束后，切回列表最上方的第一个角色（若已在则不动）。
+    /// 收艇循环到此结束，切号交由 CharacterSwitcher 自行驱动。
+    /// </summary>
+    private void FinishAndReturnToFirstCharacter()
+    {
+        _isCollecting = false;
+        _currentState = CollectState.Idle;
+
+        if (_config.CharacterPresets.Count == 0)
+        {
+            UpdateStatus("所有角色收艇完成");
+            return;
+        }
+
+        var first = _config.CharacterPresets[0];
+        if (IsOnTargetCharacter(first))
+        {
+            UpdateStatus($"所有角色收艇完成，已停在首个角色 {first.FullName}");
+            return;
+        }
+
+        UpdateStatus($"所有角色收艇完成，切回首个角色 {first.FullName}...");
+        if (_config.UseBuiltinSwitcher)
+        {
+            if (!_switcher.SwitchTo(first))
+                UpdateStatus($"收艇完成，但切回首个角色失败：{_switcher.Status}");
+        }
+        else
+        {
+            Chat.ExecuteCommand(_config.GetRelogCommand(first));
+        }
     }
 
     private bool HasReturnedSubmarine(CharacterPreset preset)

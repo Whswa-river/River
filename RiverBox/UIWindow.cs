@@ -13,7 +13,7 @@ namespace RiverBox;
 public sealed class UIWindow : IDisposable
 {
     private const string Title = "RiverBox";
-    private const string Version = "v1.0.13.0";
+    private const string Version = "v1.0.14.0";
 
     private static readonly Vector4 AccentColor = new(0f, 1f, 1f, 1f);          // 霓虹青
     private static readonly Vector4 PrimaryText = new(0.9f, 0.95f, 1f, 1f);      // 亮白偏蓝
@@ -51,6 +51,7 @@ public sealed class UIWindow : IDisposable
     private string _pluginSearch = "";
     private string _newWorld = "";
     private string _newCharacter = "";
+    private DateTime _lastSnapshotAt = DateTime.MinValue;
 
     private readonly MacroQuickSend _macroQuickSend;
     private readonly SubmarineCollect _submarineCollect;
@@ -172,19 +173,25 @@ public sealed class UIWindow : IDisposable
                 ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
                 ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(8f, 1.2f * ImGui.GetFontSize()));
 
+                var begun = false;
                 try
                 {
-                    if (ImGui.Begin($"{Title}###RiverBoxMain", ref _visible, ImGuiWindowFlags.None))
+                    // Begin/End 必须成对，即使 Begin 返回 false；放进 finally 防止
+                    // 绘制过程中异常导致 ImGui 栈失衡进而影响后续所有窗口渲染。
+                    var windowOpen = ImGui.Begin($"{Title}###RiverBoxMain", ref _visible, ImGuiWindowFlags.None);
+                    begun = true;
+                    if (windowOpen)
                     {
                         ImGui.SetWindowSize(new Vector2(900, 600), ImGuiCond.FirstUseEver);
                         DrawHeader();
                         DrawTabBar();
                         DrawFooter();
                     }
-                    ImGui.End();
                 }
                 finally
                 {
+                    if (begun)
+                        ImGui.End();
                     ImGui.PopStyleVar(6);
                     ImGui.PopStyleColor(22);
                 }
@@ -393,10 +400,16 @@ public sealed class UIWindow : IDisposable
 
         ImGui.Separator();
 
-        foreach (var preset in _submarineCollect.Config.CharacterPresets)
+        // 每 2 秒刷新一次当前角色的潜艇/物品快照即可。原先在 ImGui 绘制线程里
+        // 每帧遍历 4 页背包并写配置文件，属于纯浪费且可能造成 UI 卡顿。
+        if ((DateTime.Now - _lastSnapshotAt).TotalSeconds >= 2)
         {
-            if (IsCurrentPlayer(preset))
+            _lastSnapshotAt = DateTime.Now;
+            foreach (var preset in _submarineCollect.Config.CharacterPresets)
             {
+                if (!IsCurrentPlayer(preset))
+                    continue;
+
                 var vessels = SubmarineStatus.GetVesselData();
                 if (vessels.Count > 0)
                     _submarineCollect.Config.UpdateCache(preset.CharacterName, preset.WorldName, vessels);
@@ -608,7 +621,9 @@ public sealed class UIWindow : IDisposable
         ImGui.SameLine(160f);
         ImGui.TextColored(drLoaded ? ActiveColor : BetaColor, $"DailyRoutines: {(drLoaded ? "已开启" : "未开启")}");
         ImGui.SameLine(330f);
-        ImGui.TextColored(ActiveColor, "切号: 内置");
+        var builtinSwitch = _submarineCollect.Config.UseBuiltinSwitcher;
+        ImGui.TextColored(builtinSwitch ? ActiveColor : WarningColor,
+            builtinSwitch ? "切号: 内置" : "切号: 外部命令");
 
         if (ImGui.SmallButton("加载 AutoSubmarineCollect"))
             Chat.ExecuteCommand("/pdr load AutoSubmarineCollect");
@@ -860,7 +875,11 @@ public sealed class UIWindow : IDisposable
 
         string time = DateTime.Now.ToString("HH:mm:ss");
         float timeWidth = ImGui.CalcTextSize(time, false, 0f).X;
-        ImGui.SameLine(ImGui.GetContentRegionAvail().X - timeWidth);
+        // SameLine(posX) 的 posX 是窗口内的绝对 X，不是剩余宽度；原先传剩余宽度
+        // 会把时间挤到窗口中间。这里按右对齐重新计算。
+        var cursorX = ImGui.GetCursorPosX();
+        var rightX = cursorX + ImGui.GetContentRegionAvail().X - timeWidth;
+        ImGui.SameLine(Math.Max(cursorX, rightX));
         ImGui.TextColored(AccentColor, time);
     }
 

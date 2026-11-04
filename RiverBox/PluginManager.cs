@@ -27,10 +27,18 @@ public class ProfileInfo
 
 public static class PluginManager
 {
-    private static readonly List<string> _customOrder = [];
+    // 置顶顺序改为持久化配置，插件重载后仍保留。
+    private static List<string> CustomOrder => RiverBox.C.PluginPinnedOrder ??= [];
+
+    private static List<PluginInfo> _pluginsCache = [];
+    private static DateTime _pluginsCacheTime = DateTime.MinValue;
 
     public static List<PluginInfo> GetPlugins()
     {
+        // UI 每帧都会调用，原先每帧都枚举 InstalledPlugins 并排序，这里做 3 秒缓存。
+        if ((DateTime.Now - _pluginsCacheTime).TotalSeconds < 3)
+            return _pluginsCache;
+
         var all = Svc.PluginInterface.InstalledPlugins
             .Select(x => new PluginInfo { Name = x.Name, InternalName = x.InternalName, IsLoaded = x.IsLoaded })
             .ToList();
@@ -40,49 +48,71 @@ public static class PluginManager
 
         foreach (var p in all)
         {
-            if (_customOrder.Contains(p.InternalName))
+            if (CustomOrder.Contains(p.InternalName))
                 pinned.Add(p);
             else
                 unpinned.Add(p);
         }
 
-        pinned.Sort((a, b) => _customOrder.IndexOf(a.InternalName).CompareTo(_customOrder.IndexOf(b.InternalName)));
+        pinned.Sort((a, b) => CustomOrder.IndexOf(a.InternalName).CompareTo(CustomOrder.IndexOf(b.InternalName)));
         unpinned.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.Ordinal));
 
         var result = new List<PluginInfo>();
         result.AddRange(pinned);
         result.AddRange(unpinned);
+        _pluginsCache = result;
+        _pluginsCacheTime = DateTime.Now;
         return result;
     }
 
+    private static void InvalidatePluginsCache() => _pluginsCacheTime = DateTime.MinValue;
+
     public static void PinToTop(string internalName)
     {
-        _customOrder.Remove(internalName);
-        _customOrder.Insert(0, internalName);
+        CustomOrder.Remove(internalName);
+        CustomOrder.Insert(0, internalName);
+        RiverBox.C.Save();
+        InvalidatePluginsCache();
     }
 
     public static void Unpin(string internalName)
     {
-        _customOrder.Remove(internalName);
+        CustomOrder.Remove(internalName);
+        RiverBox.C.Save();
+        InvalidatePluginsCache();
     }
 
     public static void MoveInCustomOrder(string internalName, int newIndex)
     {
-        _customOrder.Remove(internalName);
+        CustomOrder.Remove(internalName);
         if (newIndex < 0) newIndex = 0;
-        if (newIndex > _customOrder.Count) newIndex = _customOrder.Count;
-        _customOrder.Insert(newIndex, internalName);
+        if (newIndex > CustomOrder.Count) newIndex = CustomOrder.Count;
+        CustomOrder.Insert(newIndex, internalName);
+        RiverBox.C.Save();
+        InvalidatePluginsCache();
     }
 
-    public static int GetCustomOrderIndex(string internalName) => _customOrder.IndexOf(internalName);
+    public static int GetCustomOrderIndex(string internalName) => CustomOrder.IndexOf(internalName);
 
-    public static bool IsPinned(string internalName) => _customOrder.Contains(internalName);
+    public static bool IsPinned(string internalName) => CustomOrder.Contains(internalName);
 
-    public static void EnablePlugin(string internalName) => Chat.ExecuteCommand($"/xlenableplugin \"{internalName}\"");
+    public static void EnablePlugin(string internalName)
+    {
+        Chat.ExecuteCommand($"/xlenableplugin \"{internalName}\"");
+        InvalidatePluginsCache();
+    }
 
-    public static void DisablePlugin(string internalName) => Chat.ExecuteCommand($"/xldisableplugin \"{internalName}\"");
+    public static void DisablePlugin(string internalName)
+    {
+        Chat.ExecuteCommand($"/xldisableplugin \"{internalName}\"");
+        InvalidatePluginsCache();
+    }
 
-    public static void TogglePlugin(string internalName) => Chat.ExecuteCommand($"/xltoggleplugin \"{internalName}\"");
+    public static void TogglePlugin(string internalName)
+    {
+        Chat.ExecuteCommand($"/xltoggleplugin \"{internalName}\"");
+        InvalidatePluginsCache();
+    }
 
     public static void OpenPlugin(string internalName)
     {

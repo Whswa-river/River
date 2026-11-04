@@ -32,7 +32,31 @@ public class SubmarineConfig
             if (File.Exists(path))
             {
                 var json = File.ReadAllText(path);
-                return JsonSerializer.Deserialize<SubmarineConfig>(json) ?? new SubmarineConfig();
+                var cfg = JsonSerializer.Deserialize<SubmarineConfig>(json) ?? new SubmarineConfig();
+
+                // JSON 里显式写 null 或旧版残留字段会覆盖属性默认值，导致后续
+                // 遍历时 NRE；这里做一次归一化。
+                cfg.CharacterPresets ??= [];
+                cfg.CharacterPresets.RemoveAll(p => p is null);
+                foreach (var p in cfg.CharacterPresets)
+                {
+                    p.CharacterName ??= "";
+                    p.WorldName ??= "";
+                }
+
+                cfg.CharacterCaches ??= [];
+                cfg.CharacterCaches.RemoveAll(c => c is null);
+                foreach (var c in cfg.CharacterCaches)
+                {
+                    c.CharacterName ??= "";
+                    c.WorldName ??= "";
+                    c.Vessels ??= [];
+                    c.Vessels.RemoveAll(v => v is null);
+                }
+
+                cfg.ExternalRelogCommand ??= "/ays relog {0}@{1}";
+                cfg.DelayBetweenCallbacksMs = Math.Clamp(cfg.DelayBetweenCallbacksMs, 100, 5000);
+                return cfg;
             }
         }
         catch (Exception e)

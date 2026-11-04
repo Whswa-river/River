@@ -31,6 +31,8 @@ public class MacroQuickSend : IDisposable
     private static extern bool GlobalUnlock(IntPtr hMem);
     [DllImport("kernel32.dll")]
     private static extern UIntPtr GlobalSize(IntPtr hMem);
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr GlobalFree(IntPtr hMem);
 
     private const uint CF_UNICODETEXT = 13;
     private const uint GMEM_MOVEABLE = 0x0002;
@@ -38,15 +40,34 @@ public class MacroQuickSend : IDisposable
     private static void SetClipboardText(string text)
     {
         if (string.IsNullOrEmpty(text)) return;
-        OpenClipboard(0);
-        EmptyClipboard();
-        var bytes = Encoding.Unicode.GetBytes(text + "\0");
-        var hMem = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)bytes.Length);
-        var dest = GlobalLock(hMem);
-        Marshal.Copy(bytes, 0, dest, bytes.Length);
-        GlobalUnlock(hMem);
-        SetClipboardData(CF_UNICODETEXT, hMem);
-        CloseClipboard();
+        if (!OpenClipboard(0)) return;
+
+        try
+        {
+            if (!EmptyClipboard()) return;
+
+            var bytes = Encoding.Unicode.GetBytes(text + "\0");
+            var hMem = GlobalAlloc(GMEM_MOVEABLE, (UIntPtr)bytes.Length);
+            if (hMem == IntPtr.Zero) return;
+
+            var dest = GlobalLock(hMem);
+            if (dest == IntPtr.Zero)
+            {
+                GlobalFree(hMem);
+                return;
+            }
+
+            Marshal.Copy(bytes, 0, dest, bytes.Length);
+            GlobalUnlock(hMem);
+
+            // 成功后内存所有权移交系统，不能再 GlobalFree；失败才需要释放。
+            if (SetClipboardData(CF_UNICODETEXT, hMem) == IntPtr.Zero)
+                GlobalFree(hMem);
+        }
+        finally
+        {
+            CloseClipboard();
+        }
     }
 
     private static string GetClipboardText()
@@ -103,6 +124,7 @@ public class MacroQuickSend : IDisposable
         if (!_config.ShowFloating || _drawing) return;
 
         _drawing = true;
+        var begun = false;
         try
         {
             ImGui.PushStyleColor(ImGuiCol.WindowBg, WindowBg);
@@ -129,8 +151,9 @@ public class MacroQuickSend : IDisposable
                 ImGuiWindowFlags.AlwaysAutoResize |
                 ImGuiWindowFlags.NoTitleBar |
                 ImGuiWindowFlags.NoScrollbar);
+            begun = true;
 
-ImGui.TextColored(AccentColor, "快捷发宏");
+            ImGui.TextColored(AccentColor, "快捷发宏");
             ImGui.Separator();
 
             for (int g = 0; g < _config.Groups.Count; g++)
@@ -185,19 +208,20 @@ ImGui.TextColored(AccentColor, "快捷发宏");
                 ImGui.Spacing();
             }
 
-            ImGui.PopStyleVar(3);
-            ImGui.PopStyleColor(10);
-
             if (!show)
+            {
                 _config.ShowFloating = false;
-
-            ImGui.End();
-
-            if (!show)
                 SaveConfig(_config);
+            }
         }
         finally
         {
+            // 样式必须在对应的 Begin/End 之后成对弹出；放入 finally 避免异常时
+            // ImGui 样式栈失衡（原先 12 个 Push 只 Pop 了 10 个，每帧泄漏 2 个）。
+            if (begun)
+                ImGui.End();
+            ImGui.PopStyleVar(3);
+            ImGui.PopStyleColor(12);
             _drawing = false;
         }
     }
@@ -294,7 +318,7 @@ ImGui.TextColored(AccentColor, "快捷发宏");
             return;
         }
 
-        if (_config.SelectedGroup >= _config.Groups.Count)
+        if (_config.SelectedGroup < 0 || _config.SelectedGroup >= _config.Groups.Count)
             _config.SelectedGroup = 0;
 
         var groupNames = _config.Groups.Select(g => string.IsNullOrWhiteSpace(g.Name) ? "未命名" : g.Name).ToArray();
@@ -391,7 +415,7 @@ ImGui.TextColored(AccentColor, "快捷发宏");
             ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.5f, 0.15f, 0.9f, 1f));
 
             if (ImGui.Button("发送", new Vector2(55, 32)))
-                SendMacro(entry.Command);
+                SendMacro(entry.Command ?? "");
 
             ImGui.PopStyleColor(3);
 
@@ -483,7 +507,7 @@ ImGui.TextColored(AccentColor, "快捷发宏");
             for (int i = 0; i < lines.Count; i++)
             {
                 var line = lines[i];
-                Svc.Framework.RunOnTick(() => Chat.SendMessage(line));
+                _ = Svc.Framework.RunOnTick(() => Chat.SendMessage(line));
                 if (i < lines.Count - 1 && delayMs > 0)
                     await Task.Delay(delayMs);
             }
@@ -565,7 +589,21 @@ ImGui.TextColored(AccentColor, "快捷发宏");
         {
             var path = System.IO.Path.Combine(Svc.PluginInterface.ConfigDirectory.FullName, "MacroQuickSend.json");
             if (System.IO.File.Exists(path))
-                return System.Text.Json.JsonSerializer.Deserialize<Config>(System.IO.File.ReadAllText(path)) ?? new Config();
+            {
+                var cfg = System.Text.Json.JsonSerializer.Deserialize<Config>(System.IO.File.ReadAllText(path)) ?? new Config();
+                cfg.Groups ??= new();
+                cfg.Groups.RemoveAll(g => g is null);
+                foreach (var g in cfg.Groups)
+                {
+                    g.Macros ??= new();
+                    g.Macros.RemoveAll(m => m is null);
+                    g.Name ??= "";
+                }
+                cfg.CollapsedGroupIndices ??= new();
+                if (cfg.SelectedGroup < 0 || cfg.SelectedGroup >= cfg.Groups.Count)
+                    cfg.SelectedGroup = 0;
+                return cfg;
+            }
         }
         catch { }
         return new Config();
