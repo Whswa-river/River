@@ -13,6 +13,12 @@ public class SubmarineConfig
     public List<SubmarineCacheData> CharacterCaches { get; set; } = [];
     public int DelayBetweenCallbacksMs { get; set; } = 500;
 
+    /// <summary>使用内置切号（不依赖 /ays 等外部插件）。关闭后回落到 ExternalRelogCommand。</summary>
+    public bool UseBuiltinSwitcher { get; set; } = true;
+
+    /// <summary>外部切号命令模板，{0}=角色名 {1}=服务器名。</summary>
+    public string ExternalRelogCommand { get; set; } = "/ays relog {0}@{1}";
+
     private static string GetConfigPath()
     {
         return Path.Combine(Svc.PluginInterface.ConfigDirectory.FullName, "SubmarineCollect.json");
@@ -88,7 +94,18 @@ public class SubmarineConfig
 
     public string GetRelogCommand(CharacterPreset preset)
     {
-        return $"/ays relog {preset.CharacterName}@{preset.WorldName}";
+        var template = string.IsNullOrWhiteSpace(ExternalRelogCommand)
+            ? "/ays relog {0}@{1}"
+            : ExternalRelogCommand;
+
+        try
+        {
+            return string.Format(template, preset.CharacterName, preset.WorldName);
+        }
+        catch (FormatException)
+        {
+            return $"/ays relog {preset.CharacterName}@{preset.WorldName}";
+        }
     }
 
     public void UpdateCache(string characterName, string worldName, List<SubmarineVesselInfo> vessels)

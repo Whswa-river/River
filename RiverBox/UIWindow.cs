@@ -13,7 +13,7 @@ namespace RiverBox;
 public sealed class UIWindow : IDisposable
 {
     private const string Title = "RiverBox";
-    private const string Version = "v1.0.12.0";
+    private const string Version = "v1.0.13.0";
 
     private static readonly Vector4 AccentColor = new(0f, 1f, 1f, 1f);          // 霓虹青
     private static readonly Vector4 PrimaryText = new(0.9f, 0.95f, 1f, 1f);      // 亮白偏蓝
@@ -90,6 +90,47 @@ public sealed class UIWindow : IDisposable
     public void MoveToFieldMarker(string marker) => _fieldMarkerMover.MoveToByName(marker);
 
     public void StartSubmarineCollect() => _submarineCollect.StartCollecting();
+
+    /// <summary>命令 /rb 切号 [角色@服务器]：不带参数则切到第一个启用的预设。</summary>
+    public void SwitchCharacter(string target)
+    {
+        var cfg = _submarineCollect.Config;
+        CharacterPreset? preset = null;
+
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            var at = target.IndexOf('@');
+            if (at <= 0 || at >= target.Length - 1)
+            {
+                Svc.Chat.PrintError("[RiverBox] 用法：/rb 切号 角色名@服务器名");
+                return;
+            }
+
+            var name = target[..at].Trim();
+            var world = target[(at + 1)..].Trim();
+            preset = cfg.CharacterPresets.FirstOrDefault(p =>
+                p.CharacterName.Equals(name, StringComparison.OrdinalIgnoreCase) &&
+                p.WorldName.Equals(world, StringComparison.OrdinalIgnoreCase));
+            preset ??= new CharacterPreset { CharacterName = name, WorldName = world };
+        }
+        else
+        {
+            preset = cfg.CharacterPresets.FirstOrDefault(p => p.Enabled)
+                     ?? cfg.CharacterPresets.FirstOrDefault();
+        }
+
+        if (preset == null)
+        {
+            Svc.Chat.PrintError("[RiverBox] 没有可切换的角色预设");
+            return;
+        }
+
+        var ok = _submarineCollect.SwitchToCharacter(preset);
+        if (ok)
+            Svc.Chat.Print($"[RiverBox] 开始切号：{preset.FullName}");
+        else
+            Svc.Chat.PrintError($"[RiverBox] 切号失败：{_submarineCollect.Switcher.Status}");
+    }
 
     public void Draw()
     {
@@ -285,7 +326,40 @@ public sealed class UIWindow : IDisposable
     private void DrawSubmarinePanel()
     {
         ImGui.TextColored(PrimaryText, "自动收艇");
-        ImGui.TextColored(SecondaryText, "勾选角色后点击开始，逐个切换角色并调用 DailyRoutines 收艇");
+        ImGui.TextColored(SecondaryText, "勾选角色后点击开始：内置切号逐个登录角色，收艇仍由 DailyRoutines 执行");
+        ImGui.Separator();
+
+        bool builtinSwitch = _submarineCollect.Config.UseBuiltinSwitcher;
+        if (ImGui.Checkbox("内置切号（不依赖 /ays 等外部插件）", ref builtinSwitch))
+        {
+            _submarineCollect.Config.UseBuiltinSwitcher = builtinSwitch;
+            _submarineCollect.Config.Save();
+        }
+
+        if (!builtinSwitch)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(SecondaryText, "外部命令");
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(220f);
+            var template = _submarineCollect.Config.ExternalRelogCommand;
+            if (ImGui.InputText("##extRelog", ref template, 128))
+                _submarineCollect.Config.ExternalRelogCommand = template;
+            if (ImGui.IsItemDeactivatedAfterEdit())
+                _submarineCollect.Config.Save();
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("占位符：{0}=角色名，{1}=服务器名\n默认: /ays relog {0}@{1}");
+        }
+
+        if (_submarineCollect.Switcher.IsBusy)
+        {
+            ImGui.TextColored(WarningColor, $"切号中：{_submarineCollect.Switcher.Status}");
+        }
+        else if (_submarineCollect.Switcher.LastFailed)
+        {
+            ImGui.TextColored(BetaColor, $"切号失败：{_submarineCollect.Switcher.Status}");
+        }
+
         ImGui.Separator();
 
         if (_submarineCollect.IsCollecting)
@@ -478,7 +552,10 @@ public sealed class UIWindow : IDisposable
                 ImGui.SameLine();
                 if (ImGui.SmallButton("切换"))
                 {
-                    Chat.ExecuteCommand($"/ays relog {preset.CharacterName}@{preset.WorldName}");
+                    if (_submarineCollect.Config.UseBuiltinSwitcher)
+                        _submarineCollect.SwitchToCharacter(preset);
+                    else
+                        Chat.ExecuteCommand(_submarineCollect.Config.GetRelogCommand(preset));
                 }
 
                 ImGui.Unindent(10f);
@@ -530,6 +607,8 @@ public sealed class UIWindow : IDisposable
         ImGui.TextColored(lifeLoaded ? ActiveColor : BetaColor, $"Lifestream: {(lifeLoaded ? "已开启" : "未开启")}");
         ImGui.SameLine(160f);
         ImGui.TextColored(drLoaded ? ActiveColor : BetaColor, $"DailyRoutines: {(drLoaded ? "已开启" : "未开启")}");
+        ImGui.SameLine(330f);
+        ImGui.TextColored(ActiveColor, "切号: 内置");
 
         if (ImGui.SmallButton("加载 AutoSubmarineCollect"))
             Chat.ExecuteCommand("/pdr load AutoSubmarineCollect");

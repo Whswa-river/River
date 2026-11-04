@@ -17,6 +17,7 @@ namespace RiverBox;
 public class SubmarineCollect : IDisposable
 {
     private SubmarineConfig _config;
+    private readonly CharacterSwitcher _switcher;
     private bool _isCollecting = false;
     private int _currentPresetIndex = -1;
     private string _statusMessage = "";
@@ -44,16 +45,19 @@ public class SubmarineCollect : IDisposable
     public bool IsCollecting => _isCollecting;
     public string StatusMessage => _statusMessage;
     public SubmarineConfig Config => _config;
+    public CharacterSwitcher Switcher => _switcher;
 
     public SubmarineCollect()
     {
         _config = SubmarineConfig.Load();
+        _switcher = new CharacterSwitcher();
         Svc.Framework.Update += OnFrameworkUpdate;
     }
 
     public void Dispose()
     {
         Svc.Framework.Update -= OnFrameworkUpdate;
+        _switcher.Dispose();
     }
 
     private void OnFrameworkUpdate(IFramework framework)
@@ -84,17 +88,44 @@ public class SubmarineCollect : IDisposable
     private void HandleReloggingState()
     {
         var preset = _config.CharacterPresets[_currentPresetIndex];
+        var progress = $"({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})";
+
         if (IsOnTargetCharacter(preset))
         {
-            UpdateStatus($"切换完成，等待角色就绪... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
+            _switcher.Acknowledge();
+            UpdateStatus($"切换完成，等待角色就绪... {progress}");
             _stateTimer.Restart();
             _currentState = CollectState.WaitingForCharacterReady;
             return;
         }
 
+        if (_config.UseBuiltinSwitcher)
+        {
+            if (_switcher.IsBusy)
+            {
+                var msg = $"{_switcher.Status} {progress}";
+                if (msg != _statusMessage)
+                    UpdateStatus(msg);
+
+                if (_stateTimer.ElapsedMilliseconds > 300000)
+                {
+                    _switcher.Cancel("切号超时");
+                    UpdateStatus($"切号超时，跳过... {progress}");
+                    SkipToNextCharacter();
+                }
+                return;
+            }
+
+            // 状态机已结束但没落在目标角色上
+            UpdateStatus($"{_switcher.Status}，跳过... {progress}");
+            _switcher.Acknowledge();
+            SkipToNextCharacter();
+            return;
+        }
+
         if (_stateTimer.ElapsedMilliseconds > 60000)
         {
-            UpdateStatus($"切换角色超时，跳过... ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
+            UpdateStatus($"切换角色超时，跳过... {progress}");
             SkipToNextCharacter();
         }
     }
@@ -256,7 +287,16 @@ public class SubmarineCollect : IDisposable
         _currentState = CollectState.Idle;
         _stateTimer.Reset();
         _closingWatch.Reset();
+        _switcher.Cancel("已停止收艇");
         UpdateStatus("已停止收艇");
+    }
+
+    /// <summary>手动切到指定角色（不影响收艇流程）。</summary>
+    public bool SwitchToCharacter(CharacterPreset preset)
+    {
+        var ok = _switcher.SwitchTo(preset);
+        UpdateStatus(ok ? _switcher.Status : $"切号失败：{_switcher.Status}");
+        return ok;
     }
 
     private void ProcessNextCharacter()
@@ -298,8 +338,20 @@ public class SubmarineCollect : IDisposable
 
         UpdateStatus($"正在处理: {preset.FullName} ({_currentPresetIndex + 1}/{_config.CharacterPresets.Count})");
 
-        var relogCommand = _config.GetRelogCommand(preset);
-        Chat.ExecuteCommand(relogCommand);
+        if (_config.UseBuiltinSwitcher)
+        {
+            if (!_switcher.SwitchTo(preset))
+            {
+                var reason = _switcher.Status;
+                StopCollecting();
+                UpdateStatus($"切号启动失败：{reason}，已停止");
+                return;
+            }
+        }
+        else
+        {
+            Chat.ExecuteCommand(_config.GetRelogCommand(preset));
+        }
 
         _stateTimer.Restart();
         _currentState = CollectState.Relogging;
