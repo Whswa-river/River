@@ -19,6 +19,9 @@ public class SubmarineConfig
     /// <summary>外部切号命令模板，{0}=角色名 {1}=服务器名。</summary>
     public string ExternalRelogCommand { get; set; } = "/ays relog {0}@{1}";
 
+    /// <summary>全部收艇完成后直接关闭游戏（发送 /xlkill），不再切回首个角色。</summary>
+    public bool CloseGameAfterCollect { get; set; } = false;
+
     private static string GetConfigPath()
     {
         return Path.Combine(Svc.PluginInterface.ConfigDirectory.FullName, "SubmarineCollect.json");

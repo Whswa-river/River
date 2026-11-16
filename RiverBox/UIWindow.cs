@@ -13,7 +13,7 @@ namespace RiverBox;
 public sealed class UIWindow : IDisposable
 {
     private const string Title = "RiverBox";
-    private const string Version = "v1.0.14.0";
+    private const string Version = "v1.0.15.0";
 
     private static readonly Vector4 AccentColor = new(0f, 1f, 1f, 1f);          // 霓虹青
     private static readonly Vector4 PrimaryText = new(0.9f, 0.95f, 1f, 1f);      // 亮白偏蓝
@@ -340,6 +340,13 @@ public sealed class UIWindow : IDisposable
         if (ImGui.Checkbox("内置切号（不依赖 /ays 等外部插件）", ref builtinSwitch))
         {
             _submarineCollect.Config.UseBuiltinSwitcher = builtinSwitch;
+            _submarineCollect.Config.Save();
+        }
+
+        bool closeGame = _submarineCollect.Config.CloseGameAfterCollect;
+        if (ImGui.Checkbox("收完关闭游戏（/xlkill 直接退出）", ref closeGame))
+        {
+            _submarineCollect.Config.CloseGameAfterCollect = closeGame;
             _submarineCollect.Config.Save();
         }
 

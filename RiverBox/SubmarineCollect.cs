@@ -313,7 +313,10 @@ public class SubmarineCollect : IDisposable
     {
         if (_currentPresetIndex >= _config.CharacterPresets.Count)
         {
-            FinishAndReturnToFirstCharacter();
+            if (_config.CloseGameAfterCollect)
+                ShutdownGameAfterCollect();
+            else
+                FinishAndReturnToFirstCharacter();
             return;
         }
 
@@ -397,6 +400,17 @@ public class SubmarineCollect : IDisposable
         {
             Chat.ExecuteCommand(_config.GetRelogCommand(first));
         }
+    }
+
+    /// <summary>
+    /// 全部收艇结束后直接关闭游戏（/xlkill），不再切回首个角色。
+    /// </summary>
+    private void ShutdownGameAfterCollect()
+    {
+        _isCollecting = false;
+        _currentState = CollectState.Idle;
+        UpdateStatus("所有角色收艇完成，关闭游戏...");
+        Chat.ExecuteCommand("/xlkill");
     }
 
     private bool HasReturnedSubmarine(CharacterPreset preset)
